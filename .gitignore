@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+output/
+*.part
+ticket.json
+job.json
+upload-headers.txt
+review.json
