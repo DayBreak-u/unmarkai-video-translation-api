@@ -11,7 +11,8 @@ import uuid
 
 import requests
 
-API_BASE = 'https://api.unmarkai.net/v1'
+# Overseas by default. Set UNMARKAI_API_BASE=https://unmarkai.cn/api/v1 for the mainland China API.
+API_BASE = os.environ.get('UNMARKAI_API_BASE', 'https://api.unmarkai.net/v1').rstrip('/')
 
 
 class ApiError(RuntimeError):
@@ -74,7 +75,10 @@ class Client:
         if upload_id:
             return resource_id(upload_id)
         if url:
-            ticket = self.request('POST', '/url-uploads', body={'source_url': https_url(url)})
+            # The contract requires an Idempotency-Key for URL imports.
+            key = str(uuid.uuid4())
+            print(f'Import Idempotency-Key: {key}', file=sys.stderr)
+            ticket = self.request('POST', '/url-uploads', body={'source_url': https_url(url)}, idempotency_key=key)
             return self.wait_upload(ticket['upload_id'], timeout, interval)
         path = Path(file)
         mime = {'.mov': 'video/quicktime', '.avi': 'video/x-msvideo', '.mkv': 'video/x-matroska',
@@ -115,7 +119,7 @@ class Client:
         while time.monotonic() < deadline:
             job = self.request('GET', f'/jobs/{resource_id(job_id)}')
             print(f"{job_id}: {job['status']} ({job.get('progress', 0)}%)", file=sys.stderr)
-            if job['status'] in ('succeeded', 'waiting_review'):
+            if job['status'] == 'succeeded':
                 return job
             if job['status'] in ('failed', 'canceled'):
                 raise ApiError(f"Job {job['status']}: {(job.get('error') or {}).get('code', 'unknown')}")
@@ -128,9 +132,6 @@ def download_results(job, output):
     directory.mkdir(parents=True, exist_ok=True)
     # This JSON contains temporary signed result URLs: keep it out of version control.
     (directory / 'job.json').write_text(json.dumps(job, indent=2) + '\n')
-    if job['status'] == 'waiting_review':
-        print('Human review required. See docs/review.md; resume this job after each confirmation.', file=sys.stderr)
-        return
     result = job.get('result') or {}
     if job['type'] == 'remove_text':
         assets = {'cleaned.mp4': result}

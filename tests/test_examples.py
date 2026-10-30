@@ -1,12 +1,15 @@
 import argparse
+import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'examples'))
+EXAMPLES = Path(__file__).resolve().parents[1] / 'examples'
+sys.path.insert(0, str(EXAMPLES))
 from client import ApiError, Client, download_results
 
 
@@ -63,9 +66,16 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(self.session.request.call_count, 1)
 
     @patch('client.time.sleep')
-    def test_polling_transitions_and_review_pause(self, sleep):
-        self.session.request.side_effect = [response({'status':'queued'}), response({'status':'waiting_review'})]
-        self.assertEqual(self.client.wait_job('job_test')['status'], 'waiting_review')
+    def test_url_import_sends_idempotency_key(self, sleep):
+        self.session.request.side_effect = [response({'upload_id':'upl_import'}), response({'status':'uploaded'})]
+        self.client.upload(url='https://cdn.example/video.mp4')
+        self.assertTrue(self.session.request.call_args_list[0].kwargs['headers']['Idempotency-Key'])
+
+    @patch('client.time.sleep')
+    def test_polling_transitions_until_succeeded(self, sleep):
+        self.session.request.side_effect = [response({'status':'queued'}), response({'status':'processing'}), response({'status':'succeeded'})]
+        self.assertEqual(self.client.wait_job('job_test')['status'], 'succeeded')
+        self.assertEqual(self.session.request.call_count, 3)
 
     def test_failed_and_canceled_jobs_stop(self):
         for status in ['failed', 'canceled']:
@@ -105,6 +115,30 @@ class ClientTests(unittest.TestCase):
         with self.assertRaisesRegex(ApiError, 'req_test') as error:
             self.client.request('GET', '/jobs/job_test')
         self.assertNotIn('signed.example', str(error.exception))
+
+
+def load_client_copy():
+    # Load a separate copy so the module used by the other tests is left untouched.
+    spec = importlib.util.spec_from_file_location('client_base_check', EXAMPLES / 'client.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class ApiBaseTests(unittest.TestCase):
+    def test_default_base_is_overseas(self):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('UNMARKAI_API_BASE', None)
+            self.assertEqual(load_client_copy().API_BASE, 'https://api.unmarkai.net/v1')
+
+    def test_env_overrides_base_and_strips_trailing_slash(self):
+        with patch.dict(os.environ, {'UNMARKAI_API_BASE': 'https://unmarkai.cn/api/v1/'}):
+            module = load_client_copy()
+        self.assertEqual(module.API_BASE, 'https://unmarkai.cn/api/v1')
+        session = MagicMock()
+        session.request.return_value = response({'status':'succeeded'})
+        module.Client('uma_live_test_only', session=session).request('GET', '/balance')
+        self.assertEqual(session.request.call_args.args[1], 'https://unmarkai.cn/api/v1/balance')
 
 
 if __name__ == '__main__':
