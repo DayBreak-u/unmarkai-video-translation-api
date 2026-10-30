@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)](examples/translate_video.py)
 [![License](https://img.shields.io/badge/examples-MIT-green)](LICENSE)
 
-Translate and dub authorized videos with the UnmarkAI REST API. Choose one target language, optionally review both the source transcript and translated text, then retrieve a localized video and subtitle files.
+Translate and dub authorized videos with the UnmarkAI REST API. Choose one target language, then retrieve a localized video and subtitle files.
 
 **[Explore the API](https://unmarkai.net/video-translation-api/) · [Get an API key](https://unmarkai.net/dashboard/api/keys) · [Try the web tool](https://unmarkai.net/video-translation-studio/)**
 
@@ -18,11 +18,8 @@ This repository contains open-source integration examples for a hosted API. It d
 flowchart LR
   A[Local video or direct HTTPS URL] --> B[Ready upload]
   B --> C[Recognize and translate]
-  C --> D{Manual review enabled?}
-  D -->|Yes| E[Review source and translation]
-  D -->|No| F[Dub and render]
-  E --> F
-  F --> G[Video and SRT files]
+  C --> D[Dub and render]
+  D --> E[Video and SRT files]
 ```
 
 This is a workflow illustration. There is no measured translation demo bundled in this repository. Start with a short video you are authorized to process and review the downloaded result.
@@ -41,7 +38,7 @@ export UNMARKAI_API_KEY='uma_live_replace_with_your_key'
 python examples/translate_video.py --file ./source.mp4 --target es
 ```
 
-The command uploads your video, creates a job, polls it and saves outputs under `output/`. The key is read from the environment; `.env.example` is a template, not automatically loaded. Keep API keys on your server.
+The command uploads your video, creates a job, polls it and saves outputs under `output/`. Requests go to `https://api.unmarkai.net/v1` by default; set `UNMARKAI_API_BASE` to override it. A separate mainland China endpoint (`https://unmarkai.cn/api/v1`, separate keys and CNY wallet) is documented in [README.zh-CN.md](README.zh-CN.md). The key is read from the environment; `.env.example` is a template, not automatically loaded. Keep API keys on your server.
 
 **Direct HTTPS import** (a downloadable video URL, not a YouTube/TikTok watch page):
 
@@ -70,16 +67,11 @@ The example prints upload ID, job ID and the creation idempotency key. Retries o
 | `--target es` | `target_language` | One target language per job; required for new jobs |
 | `--source auto` | `source_language` | Auto-detect source language by default |
 | `--advanced` | `advanced_quality` | Use Advanced rather than Standard processing |
-| `--manual-review` | `manual_review` | Pause for source text and translated text approval |
 | `--no-subtitles` | `subtitle_enabled: false` | Disable burned-in subtitles; retain voiceover |
 
 The Python quickstart exposes the core workflow. The current OpenAPI also documents `tts_enabled`, `voice_strategy`, `voice_key`, `target_locale`, background audio, reference text, subtitle styling/layout and output resolution. Consult the contract for supported combinations and the voice catalog; do not infer API controls from website features. Lip sync is not demonstrated here.
 
-```bash
-python examples/translate_video.py --file ./source.mp4 --target ja --manual-review
-```
-
-For two-stage review, see **[the review walkthrough](docs/review.md)**. Each stage has its own version and 72-hour deadline. The examples never auto-approve human review. On success, available outputs are saved as `translated.mp4`, `source.srt`, `translated.srt` and optional audio/original-ASR subtitle files.
+On success, available outputs are saved as `translated.mp4`, `source.srt`, `translated.srt` and optional audio/original-ASR subtitle files.
 
 ## REST and cURL
 

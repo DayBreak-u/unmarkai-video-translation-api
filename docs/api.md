@@ -19,22 +19,21 @@ Canonical contract: [https://unmarkai.net/openapi-v1.yaml](https://unmarkai.net/
   },
   "target_language": "es",
   "source_language": "auto",
-  "manual_review": false,
   "advanced_quality": false,
   "subtitle_enabled": true
 }
 ```
 
-`waiting_review` pauses processing: fetch, edit and confirm each stage using [review.md](review.md). On success, result.video, result.source_subtitles and result.translated_subtitles hold available assets; additional contract-defined assets may be returned.
+On success, result.video, result.source_subtitles and result.translated_subtitles hold available assets; additional contract-defined assets may be returned.
 
 ## Error handling
 
-The example retries GET and idempotent job creation on transient connection errors and 429/502/503/504, with bounded backoff. It never blindly retries a signed PUT, review PATCH or an unkeyed upload POST. On an uncertain upload result, inspect the upload before creating a replacement. Review conflicts require a fresh fetch, not an unconditional overwrite. API responses have `error.code`, `error.message`, `error.request_id`; example errors show code and request ID without dumping signed URLs.
+The example retries GET and idempotent job creation on transient connection errors and 429/502/503/504, with bounded backoff. It never blindly retries a signed PUT or an unkeyed upload POST. On an uncertain upload result, inspect the upload before creating a replacement. API responses have `error.code`, `error.message`, `error.request_id`; example errors show code and request ID without dumping signed URLs.
 
 ## cURL options
 
 `examples/quickstart.sh` expects MP4 by default; set `CONTENT_TYPE=video/quicktime` etc. for other accepted formats. It creates the upload and task and checks status once. For a complete bounded poll and download, resume with `python examples/translate_video.py --job-id job_REPLACE`.
 
-Set `TARGET_LANGUAGE=ja` for another supported language. The cURL quickstart uses manual_review=false; see the review guide for explicit human approval.
+Set `TARGET_LANGUAGE=ja` for another supported language.
 
 For an uncertain create response, preserve `output/curl/request.json` and the printed key and retry only the same POST /jobs request. Do not rerun the entire shell script with the same key, because that produces a different upload ID.
